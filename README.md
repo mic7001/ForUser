@@ -4,3 +4,5 @@
 
 ## 此处资料经常更新，请随用随下
 
+## 下载请点击右上方的 “Clone or download", --->  "download ZIP"
+
