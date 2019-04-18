@@ -1,0 +1,46 @@
+PROGRAM CAN_SEND
+can_send_cntr := can_send_cntr +1;
+
+if can_send_cntr < 50 then  (* send  every 500ms*)
+    return;
+end_if;
+
+can_send_cntr  := 0;
+
+CAN_sendbuf[0] := 16#55;
+CAN_sendbuf[1] := 16#55;
+CAN_sendbuf[2] := 16#55;
+CAN_sendbuf[3] := 16#55;
+CAN_sendbuf[4] := 16#55;
+CAN_sendbuf[5] := 16#55;
+CAN_sendbuf[6] := 16#55;
+CAN_sendbuf[7] := any_to_sint(can_tx_cntr );
+
+can_tx := CAN_IITX(0, 602 , CAN_sendbuf,8 ,1);
+if can_tx = 8 then
+    can_tx_cntr := can_tx_cntr +1;
+end_if;
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+END_PROGRAM

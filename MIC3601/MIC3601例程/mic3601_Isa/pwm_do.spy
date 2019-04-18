@@ -1,0 +1,4 @@
+ColOrderArray=0,8,2,3,7,1,6,4,5
+ColWidthArray=203,60,60,60,60,60,60,60,60
+1;1;4528;p_do_test;RESOURCE1;CONFIG1
+1;1;4530;p_pwm_test;RESOURCE1;CONFIG1

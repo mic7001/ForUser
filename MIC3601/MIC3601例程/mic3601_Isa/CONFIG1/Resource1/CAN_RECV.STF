@@ -1,0 +1,63 @@
+PROGRAM CAN_RECV
+if not can_init then
+    ret_dint := disable_all_do( );
+    return;
+end_if;
+
+
+can_rx :=  CAN_IIRX(0, 601, CAN_readbuf, 8, 1) ;
+if can_rx > 0 then
+    can_timeout_cntr := 0;
+    can_recv_cntr := can_recv_cntr +1;
+    can_ok := true;
+    sint_tmp0 := CAN_readbuf[0];
+    DO_00 := sint_tmp0.0;
+    DO_01 := sint_tmp0.1;
+    DO_02 := sint_tmp0.2;
+    DO_03 := sint_tmp0.3;
+    DO_04 := sint_tmp0.4;
+    DO_05 := sint_tmp0.5;
+    DO_06 := sint_tmp0.6;
+    DO_07 := sint_tmp0.7;
+
+    sint_tmp1 := CAN_readbuf[1];
+    DO_08 := sint_tmp1.0;
+    DO_09 := sint_tmp1.1;
+    DO_10 := sint_tmp1.2;
+    DO_11 := sint_tmp1.3;
+    DO_12 := sint_tmp1.4; 
+    DO_13 := sint_tmp1.5; 
+else
+    can_timeout_cntr  := can_timeout_cntr  + 1;
+    if can_timeout_cntr > 100 then
+        ret_dint :=disable_all_do( );
+    end_if; 
+end_if;
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+END_PROGRAM

@@ -1,0 +1,514 @@
+PROGRAM LOGIC_CONTROL
+
+
+
+
+Alarm_do := false ;							(*蜂鸣器*)
+Horn_do := FALSE ;							(*喇叭*)
+
+ton_alarm(not(ton_alarm.Q), t#500ms) ;
+if ton_alarm.Q then 
+	Change_500state := not( Change_500state ) ;
+end_if ;
+
+
+(**供电电源监控**)
+
+Power24V_real := any_to_real(%ID0.8)*24.0/3349.0 ; 			(**24V 对应的理论采集值位3349**)
+
+Power24V := (1499.0*Power24V +  Power24V_real )/1500.0 ;		(*延时滤波，程序周期为10ms，1500个程序周期的滤波，相当于响应时间为15S*)
+
+
+if Power24V >= 22.9 then
+	Battery_dispstate := any_to_sint(16#B5) ;
+elsif (Power24V >= 21.9 ) and (Power24V <= 22.4 ) then
+	Battery_dispstate  := any_to_sint(16#B4) ;
+elsif (Power24V >= 21.0 ) and (Power24V <= 21.3 ) then
+	Battery_dispstate  := any_to_sint(16#B3) ;
+elsif (Power24V >= 20.1 ) and (Power24V <= 20.3 ) then
+	Battery_dispstate  := any_to_sint(16#B2) ;
+elsif (Power24V >= 18.0 ) and (Power24V <= 19.2 ) then
+	Battery_dispstate  := any_to_sint(16#B1) ;
+elsif (Power24V >= 15.3 ) and (Power24V <= 17.3 ) then
+	Battery_dispstate  := any_to_sint(16#B0) ;
+elsif (Power24V < 15.3 ) then
+	Battery_dispstate := any_to_sint(16#B0) ;
+	Error_Code := 16#0688 ;(*低电压报警,显示为68。 *)
+end_if ;
+
+ECU_sendbuf[7] := Battery_dispstate  ;
+
+
+
+(*在参数设置状态，后续不做处理*)
+if  (Para_setting = 1)then
+	return ;
+END_IF; 
+
+
+
+(*坑洞保护监测*)
+r_trig_1(Potholelimitswitch_di = FALSE);
+if r_trig_1.Q then
+	 if  Error_Code <> 16#0188 then
+		Error_Code_old := Error_Code  ;		(*记住上次的故障码*)
+		Error_Code := 16#0188;				(*显示18。，坑洞保护错误,停止起升和行走*) 
+	end_if ;
+end_if ;
+
+r_trig_2 ( Potholelimitswitch_di );
+if r_trig_2.Q then
+	
+	Error_Code := Error_Code_old  ;
+end_if ;
+
+
+(*倾斜开关监测*)
+r_trig_3( Tiltsensor_di = FALSE ) ;
+if r_trig_3.Q then
+	if  Error_Code <> 16#1595 then
+		Error_Code_old := Error_Code  ;		(*记住上次的故障码*)
+		Error_Code := 16#1595;				(*显示LL。，Fault 机器倾斜超过安全限定错误，停止起升和行走*)
+	end_if ;
+end_if ;
+
+r_trig_4( Tiltsensor_di  );
+if r_trig_4.Q then
+	Error_Code := Error_Code_old  ;
+end_if ;
+
+
+Ecu_operationcode := 0 ;	(*ECU操作码*)
+
+(*数据处理*)
+r_trig_5( PCU_comOK = 0 ) ;
+if r_trig_5.Q then
+	if ( Error_Code <> 16#0002 + 16#80 )then
+		Error_Code_old := Error_Code  ;		(*记住上次的故障码*)
+		Error_Code := 16#0002 + 16#80;		(*通信异常,显示为02 *)
+	end_if ;
+end_if ;
+
+r_trig_6( PCU_comOK > 0  );
+if r_trig_6.Q then
+	Error_Code := Error_Code_old  ;
+end_if ;
+
+
+
+(*手柄值模拟量值，手柄向前是0-127，后退是255-129*)
+
+if Error_Code = 0   then
+	Error_Code   :=  Alarm_code   ;				(*如果无其他错误值，则显示报警状态*)
+end_if ;
+
+Error_Process_fb( Error_Code  ) ; 
+
+(*提升与下降*)
+(*在平台操作模式下，工作在升降模式下*)
+if (Keyswitch_di = TRUE )  THEN 
+	if  (work_mode = 16#D7  ) then
+		(*平台提升控制*)
+		if ( Handleenable_key and Handlemid_key and (Handle_Value <= 127 ) and (Handle_Value > Control_deadzone)  and (Error_Process_fb.stopall = false ) 
+			and (Error_Process_fb.stopraisedrive = false ) and (Platformlower_do =false) )or ( Platformraise_do  )	then
+			(*端口故障诊断*)
+			(*平台升阀故障诊断异常*)
+			if Platformraise_dofaultdiagnose <> 0 then 
+				Error_Code := 16#0584 ;(*显示54.，起升上升线圈错误,停止起升和行走*)
+				Platformraise_do := FALSE ;							(*平台上升阀得电*)
+				Motorcontrolenable_do := FALSE ;						(*马达控制使能*)
+				Motorcontrolspeed_ao := 0 ;
+			else
+				Ecu_operationcode := Machine_mode  ;					(*ECU显示机器模式*)
+				Platformraise_do := true ;							(*平台上升阀得电*)
+				Motorcontrolenable_do := true ;						(*马达控制使能*)
+				platraise_fb( Handle_Value ,elevatespeedpara   );
+
+				Motorspeedcontrolvalue  := platraise_fb.out ;
+				ramp_raise( TRUE , 4095* Prog_period /2200 /1  ,4095* Prog_period /2200 /1 , 4095 , 0, Motorspeedcontrolvalue );
+				Motorcontrolspeed_temp := ramp_raise.ioutVal ;
+				
+				IF (Motorcontrolspeed_temp < 819 )and ( (Handlemid_key = false) or (Handle_Value <= Control_deadzone) )THEN  
+					Motorcontrolspeed_temp := 0;   
+					Platformraise_do := FALSE ;							(*平台上升阀得电*)
+					
+					Motorcontrolenable_do := FALSE ;				(*马达控制使能*)
+					Motor_running := false ;						(*马达控制无效*)
+				END_IF; 
+
+				Motorcontrolspeed_ao := Motorcontrolspeed_temp ;
+			end_if ;
+		END_IF; 
+
+		 (*平台下降控制*)
+		if Platformraise_do  = false then
+			if Handleenable_key and Handlemid_key = false and (Handle_Value > 127 )and  (255-Handle_Value) > Control_deadzone  and (Error_Process_fb.stopall = false )  then
+			(*端口故障诊断*)
+			(*平台下降阀故障诊断异常*)
+				if Platformlower_dofaultdiagnose <> 0 then 
+					Error_Code := 16#0505 ;								(*显示55，起升下降线圈错误,停止起升和行走*)
+					Platformlower_do := FALSE ;							(*平台下降阀得电*)(*平台下降无需马达工作*)
+				else
+					Ecu_operationcode := 16#0A01 ;						(*ECU显示A1，软件版本号暂定A1*)
+					Platformlower_do := true ;							(*平台下降阀得电*)(*平台下降无需马达工作*)
+					Alarm_do := Change_500state ;
+				end_if ;
+			else
+				Platformlower_do := FALSE ;					(*平台下降阀*)
+				Motorcontrolenable_do := FALSE ;			(*马达控制使能*)
+				Motorcontrolspeed_ao := 0 ;
+			end_if ;
+		end_if;
+	end_if ;
+
+
+
+else
+
+	
+(*end_if ;*)
+
+(*在底盘操作模式下*)
+(*if Keyswitch_di = false then *)
+
+	Platformraise_do := FALSE ;					(*平台上升阀*)	
+	Platformlower_do := FALSE ;					(*平台下降阀*)
+	Leftturn_do := FALSE ;						(*左转阀*)
+	Rightturn_do := FALSE ;						(*右转阀*)
+	Forward_do := FALSE ;						(*前进阀*)
+	Reverse_do := FALSE ;						(*后退阀*)
+	Brake_do := FALSE ;						(*刹车阀*)
+	Motorcontrolenable_do := FALSE ;				(*马达控制使能*)
+	Motorcontrolspeed_ao := 0 ;					(*马达控制速度*)
+
+	PCU_dispcode := 	16#0C91 ;	(*PCU显示CH。*)
+	
+	if Platformraiserockerswitch_di and ( Error_Process_fb.stopchassis = false )and (Error_Process_fb.stopall = false )  and (Error_Process_fb.stopraisedrive = false )  then
+		(*端口故障诊断*)
+		(*平台升阀故障诊断异常*)
+		if Platformraise_dofaultdiagnose <> 0 then 
+			Error_Code := 16#0584 ;(*显示54。，起升上升线圈错误,停止起升和行走*)
+			Platformraise_do := FALSE ;							(*平台上升阀得电*)
+			Motorcontrolenable_do := FALSE ;						(*马达控制使能*)
+			Motorcontrolspeed_ao := 0 ;
+
+		else
+			Ecu_operationcode := Machine_mode  ;						(*ECU显示机器模式*)
+			Platformraise_do := true ;								(*平台上升阀得电*)
+			Motorcontrolenable_do := true ;							(*马达控制使能*)
+		
+			platraise_fb2( 127 ,elevatespeedpara   );
+			Motorcontrolspeed_ao := platraise_fb2.out ;
+		end_if ;
+	end_if ;
+
+	 (*平台下降控制*)
+	if Platformlowerrockerswitch_di and ( Error_Process_fb.stopchassis = false ) and (Error_Process_fb.stopall = false )   then
+		(*端口故障诊断*)
+		(*平台下降阀故障诊断异常*)
+		if Platformlower_dofaultdiagnose <> 0 then 
+			Error_Code := 16#0585 ;(*显示55.，起升下降线圈错误,停止起升和行走*)
+			Platformlower_do := FALSE ;							(*平台下降阀得电*)(*平台下降无需马达工作*)
+		else
+			Ecu_operationcode := 16#0A01 ;						(*ECU显示A9*)
+			Platformlower_do := true ;							(*平台下降阀得电*)(*平台下降无需马达工作*)
+			Alarm_do := Change_500state ;
+		end_if ;
+
+	end_if;
+END_IF; 
+
+
+(*喇叭按键处理*)
+r_trig_hornkey(Horn_key);
+if r_trig_hornkey.Q then
+	Horn_key_enable := TRUE ;
+end_if ;
+f_trig_hornkey(Horn_key);
+if f_trig_hornkey.Q then
+	Horn_key_enable := FALSE ;
+end_if ;
+
+if Horn_key_enable then
+	Horn_do := true ;		(*喇叭*)
+	Alarm_do := true ;		(*蜂鸣器*)
+
+end_if ;
+
+
+if false then
+if Horn_key then
+	Horn_key_enable := true ;
+	Horn_do := true ;		(*喇叭*)
+	Alarm_do := true ;		(*蜂鸣器*)
+else
+	Horn_key_enable := FALSE ;
+	Horn_do := FALSE ;		(*喇叭*)
+	Alarm_do := FALSE ;	(*蜂鸣器*)
+end_if ;
+end_if ;
+
+(*行走控制*)
+(*在平台操作模式下，工作在行走模式下*)
+if (Keyswitch_di = TRUE ) THEN 
+	
+	if  (work_mode = 16#DD  )  and (Error_Process_fb.stopall = false ) and (Error_Process_fb.stopraisedrive = false )  THEN 
+		
+		(*左转*)
+	
+		if Handleenable_key and Leftturn_key then
+
+			(*端口故障诊断*)
+			(*左转阀故障诊断异常*)
+			if Leftturn_dofaultdiagnose <> 0 then 
+				Error_Code := 16#0587 ;(*显示57.，向左转向线圈错误，停止起升和行走*)
+				Leftturn_do := FALSE ;						(*左转阀*)
+				Motorcontrolenable_do := FALSE ;				(*马达控制使能*)
+				Motorcontrolspeed_ao := 0 ;
+			else
+				Leftturn_do := TRUE ;						(*左转阀*)
+				Motorcontrolenable_do := TRUE ;				(*马达控制使能*)
+				turnleft_fb( 127 ,turnspeedpara   );
+				Motorcontrolspeed_ao :=turnleft_fb.out ;
+			END_IF; 
+		else
+			Leftturn_do := FALSE ;					(*左转阀*)
+		end_if ;
+		(*右转*)
+	
+		if Handleenable_key and Rightturn_key then
+			(*端口故障诊断*)
+			(*右转阀故障诊断异常*)
+			if Rightturn_dofaultdiagnose <> 0 then 
+				Error_Code := 16#0586 ;(*显示56.，向右转向线圈错误，停止起升和行走*)
+				Rightturn_do := FALSE ;						(*右转阀*)
+				Motorcontrolenable_do := FALSE ;				(*马达控制使能*)
+				Motorcontrolspeed_ao := 0 ;
+			else
+
+				Rightturn_do := TRUE ;						(*右转阀*)
+				Motorcontrolenable_do := TRUE ;				(*马达控制使能*)
+				turnright_fb( 127 ,turnspeedpara   );
+				Motorcontrolspeed_ao := turnright_fb.out ;
+
+			END_IF; 
+		else
+			Rightturn_do := FALSE ;					(*右转阀*)		
+		end_if ;
+
+		if Rightturn_key = false and Leftturn_key = false  then
+			Motorcontrolenable_do := FALSE ;			(*马达控制使能*)
+			Motorcontrolspeed_ao := 0 ;
+		end_if ;
+
+		(*前进控制*)
+		if (Handleenable_key and Handlemid_key and (Handle_Value <= 127 )  and (Handle_Value > Control_deadzone) 
+			and Reverse_do = false )or (  Forward_do  )then
+			(*端口故障诊断*)
+			(*前进阀故障诊断异常*)
+			if Forward_dofaultdiagnose <> 0 then 
+				Error_Code := 16#0582 ;(*显示52.，前进线圈错误,停止起升和行走*)
+				Forward_do := FALSE ;						(*前进阀*)
+				Brake_do := FALSE ;						(*刹车阀*)
+				Motorcontrolenable_do := FALSE ;				(*马达控制使能*)
+				Leftturn_do := FALSE ;						(*左转阀*)
+				Rightturn_do := FALSE ;					(*右转阀*)
+				Motorcontrolenable_do := FALSE ;				(*马达控制使能*)
+				Motorcontrolspeed_ao := 0 ;
+			else
+				Forward_do := true ;				(*前进阀*)
+				Brake_do := TRUE ;					(*刹车阀*)
+				(*如果在非慢速模式，则设置为慢速模式*)
+				if Slow_mode <> 16#91 then
+					Slow_mode := 16#91 ;
+					rc := interretainstore(1, Slow_mode ) ;
+				end_if ;
+				Motorcontrolenable_do := TRUE ;				(*马达控制使能*)
+			
+				forward_fb( Handle_Value*any_to_dint(Handlemid_key)  ,Drivespeedwhileelevatedpara   );
+				Motorspeedcontrolvalue  := forward_fb.out ;
+				(*当前进+转向按键同时有效时，在前进的手柄控制值的基础上加1V，1V对应819*)
+				Motorspeedcontrolvalue  := Motorspeedcontrolvalue  +   819 *any_to_dint(Leftturn_key or Rightturn_key  ) ;
+				(*越界保护*) 
+				if Motorspeedcontrolvalue < 0 then
+					Motorspeedcontrolvalue  := 0 ;
+				elsif Motorspeedcontrolvalue > 4095 then 
+					Motorspeedcontrolvalue := 4095 ;
+				end_if ;
+
+				ramp_forward( TRUE , 4095* Prog_period /2200 /1  ,4095* Prog_period /2200 /1 , 4095 , 0, Motorspeedcontrolvalue );
+				Motorcontrolspeed_temp := ramp_forward.ioutVal ;
+				
+				IF (Motorcontrolspeed_temp < 819 )and ( (Handlemid_key = false) or (Handle_Value <= Control_deadzone) )THEN  
+					Motorcontrolspeed_temp := 0;   
+					Forward_do := FALSE ;						(*前进阀*)
+					Brake_do := FALSE ;						(*刹车阀*)
+					Motorcontrolenable_do := FALSE ;				(*马达控制使能*)
+					Motor_running := false ;						(*马达控制无效*)
+				END_IF; 
+				
+				Motorcontrolspeed_ao :=   Motorcontrolspeed_temp ;	(*马达控制速度*) 
+
+			end_if ;
+		END_IF; 
+		 (*后退控制*)
+		if (Handleenable_key and Handlemid_key = false and (Handle_Value > 127 )  and  ((255-Handle_Value) > Control_deadzone) and Forward_do  = false)  
+			or (Reverse_do)  then
+			(*端口故障诊断*)
+			(*后退阀故障诊断异常*)
+			if Reverse_dofaultdiagnose <> 0 then 
+				Error_Code := 16#0583 ;(*显示53.，后退线圈错误,停止起升和行走*)
+				Forward_do := FALSE ;						(*前进阀*)
+				Brake_do := FALSE ;						(*刹车阀*)
+				Motorcontrolenable_do := FALSE ;				(*马达控制使能*)
+				Leftturn_do := FALSE ;						(*左转阀*)
+				Rightturn_do := FALSE ;					(*右转阀*)
+				Motorcontrolenable_do := FALSE ;				(*马达控制使能*)
+				Motorcontrolspeed_ao := 0 ;
+			else
+				Reverse_do := true ;				(*后退阀*)
+				Brake_do := TRUE ;					(*刹车阀*)
+				(*如果在非慢速模式，则设置为慢速模式*)
+				if Slow_mode <> 16#91 then
+					Slow_mode := 16#91 ;
+					rc := interretainstore(1, Slow_mode ) ;
+				end_if ;
+				Motorcontrolenable_do := TRUE ;				(*马达控制使能*)
+
+				reverse_fb( (255-Handle_Value)*any_to_dint(Handlemid_key = false)  , Drivespeedwhileelevatedpara   );
+				Motorspeedcontrolvalue  := reverse_fb.out ;
+				(*当前进+转向按键同时有效时，在前进的手柄控制值的基础上加1V，1V对应819*)
+
+				Motorspeedcontrolvalue  := Motorspeedcontrolvalue  +   819 *any_to_dint(Leftturn_key or Rightturn_key  ) ;
+				(*越界保护*) 
+				if Motorspeedcontrolvalue < 0 then
+					Motorspeedcontrolvalue  := 0 ;
+				elsif Motorspeedcontrolvalue > 4095 then 
+					Motorspeedcontrolvalue := 4095 ;
+				end_if ;
+
+				ramp_reverse( TRUE , 4095* Prog_period /2200 /1  ,4095* Prog_period /2200 /1 , 4095 , 0, Motorspeedcontrolvalue );
+				Motorcontrolspeed_temp := ramp_reverse.ioutVal ;
+				
+				IF (Motorcontrolspeed_temp < 819 ) and (  (Handlemid_key ) or ((255-Handle_Value) < Control_deadzone) or  (Handle_Value <= Control_deadzone)
+					or( ( Handle_Value > Control_deadzone) and ( Handle_Value <= 127 )) )THEN  
+					Motorcontrolspeed_temp := 0;   
+					Reverse_do := FALSE ;						(*前进阀*)
+					Brake_do := FALSE ;						(*刹车阀*)
+					Motorcontrolenable_do := FALSE ;				(*马达控制使能*)
+					Motor_running := false ;						(*马达控制无效*)
+				END_IF; 
+				
+				Motorcontrolspeed_ao :=   Motorcontrolspeed_temp ;	(*马达控制速度*) 
+
+			end_if ;
+		end_if;
+
+	END_IF; 
+END_IF; 
+
+
+(*电池耗尽关机和报警状态处理*)
+(*当电量小于等于一格时*)
+if Battery_dispstate = any_to_sint(16#B0)  then 
+	Batterylowerdelay :=  Batterylowerdelay  + 1;
+else
+
+	Batterylowerdelay := 0 ;
+end_if ;
+
+if 	Batterydrainalarmdelay > 0 then
+	if Batterylowerdelay * Prog_period >= Batterydrainalarmdelay *60*1000 then
+
+		if (Error_Process_fb.stopall = false ) and (Error_Process_fb.stopraisedrive = false )  then
+			Error_Code := 16#0386 ;(*显示36.，电池耗尽报警状态*)
+		end_if ;
+
+	end_if ;
+end_if ;
+
+
+(*在【关机时间，单位分钟】后没有任何动作，进入非常低耗的睡眠模式。重
+启电脑会恢复正常操作*)
+
+Shutoffdelay := Shutoffdelay + 1;
+if  ( Platformraise_do or Platformlower_do  or Leftturn_do or Rightturn_do or Forward_do or
+	 Reverse_do or  Brake_do  ) then
+	Shutoffdelay := 0 ;
+end_if ;
+
+if Batterydrainshutoffdelay > 0 then
+	if Shutoffdelay * Prog_period >= Batterydrainshutoffdelay *60*1000 then
+		Error_Code := 16#2828 ;(*显示‘口口’，电池耗尽关机状态*)
+		work_mode := 16#D5 ;(*D5 表示工作模式状态无效*)
+	end_if ;
+end_if ;
+
+if Error_Process_fb.alarm500 then
+	Alarm_do := Change_500state ; 		(*500ms蜂鸣器*)
+end_if ;
+
+if Error_Process_fb.alarm300 then
+	Alarm_do := flash_state ; 		(*300ms蜂鸣器*)
+end_if ;
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+END_PROGRAM

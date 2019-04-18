@@ -1,0 +1,7 @@
+ColOrderArray=0,8,2,3,7,1,6,4,5
+ColWidthArray=210,60,60,60,60,60,60,60,60
+1;1;6518;Platformlowerrockerswitch_di;RESOURCE1;CONFIG1
+1;1;6441;Bottomlimitswitch_di;RESOURCE1;CONFIG1
+1;1;6454;Platformlower_do;RESOURCE1;CONFIG1
+1;1;6448;Alarm_do;RESOURCE1;CONFIG1
+1;1;6615;lower_start_ton;RESOURCE1;CONFIG1

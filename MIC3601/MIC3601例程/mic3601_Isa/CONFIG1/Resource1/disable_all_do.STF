@@ -1,0 +1,21 @@
+FUNCTION DISABLE_ALL_DO
+    DO_00 := false;
+    DO_01 := false;
+    DO_02 := false;
+    DO_03 := false;
+    DO_04 := false;
+    DO_05 := false;
+    DO_06 := false;
+    DO_07 := false;
+    DO_08 := false;
+    DO_09 := false;
+    DO_10 := false;
+    DO_11 := false;
+    DO_12 := false;
+    DO_13 := false;
+disable_all_do := 1;
+
+
+
+
+END_FUNCTION
