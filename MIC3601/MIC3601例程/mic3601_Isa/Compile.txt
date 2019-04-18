@@ -1,0 +1,6 @@
+!
+!File for the incremental compilation
+!#ALL=Build all project
+!#POU:refpou=Build the POU referenced nnn
+!
+#All
