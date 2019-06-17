@@ -3,6 +3,11 @@
 cd /userapp/mic7001_update
 
 chmod 775 /userapp
+
+rm /userapp/gprs_update_start -f
+rm /userapp/gprs_update_success -f
+touch /userapp/gprs_update_start
+
 #####################################################################
 #  update IoTaskMIC7001
 #####################################################################
@@ -22,3 +27,6 @@ chmod +x /userapp/IoTaskMIC7001
 #  update libIoDrvMIC7001.so
 #####################################################################
 cp -rfa ./data/libIoDrvMIC7001.so  /mnt/mmcblk1p2/usr/lib/utils_lib/
+
+rm /userapp/gprs_update_start -f
+touch /userapp/gprs_update_success
