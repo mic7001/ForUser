@@ -16,7 +16,6 @@
 14. cyber-gprs.hearbeat.*.project  通过GPRS定时向云端发送心跳的例程
 15. Networkvariables.sender.project  通过网络变量发送数据的例程，需要安装 NetVarUDP 库
 16. Networkvariables.recver.project  通过网络变量接收数据的例程，需要安装 NetVarUDP 库
-17. CANBusAPI.package  来自codesys官方的CAN总线编程接口，可以直接鼠标双击，会自动安装。
 18. Date.and.time.*.project  读取和设置系统时间的例程，需要安装 CAA DTUtil Extern 库。
 19. dint.data.save.*.project  以文件形式将dint类型的实时数据写入控制器内部的硬盘。
 20. real.data.save.*.project  以文件形式将real类型的实时数据写入控制器内部的硬盘。
