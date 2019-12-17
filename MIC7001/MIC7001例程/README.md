@@ -20,7 +20,7 @@
 18. dint.data.save.*.project  以文件形式将dint类型的实时数据写入控制器内部的硬盘。
 19. real.data.save.*.project  以文件形式将real类型的实时数据写入控制器内部的硬盘。
 20. full_demo.*.project  一个相对完整的工程机械控制软件例程，包括柴油机控制，主油泵调节，与显示屏的通信，实时数据的保存等。
-
+21. mqtt_publish_sample.*.project  通过内置的GPRS模块实现MQTT协议的数据发布。
 
 
 例程使用方法：
