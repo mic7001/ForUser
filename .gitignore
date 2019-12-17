@@ -1,2 +1,6 @@
 *.opt
 MIC7001ForUser
+*.bootinfo
+*.compileinfo
+*.opt
+
