@@ -1,27 +1,50 @@
 # MIC7001例程说明
 
 1. cyber_gprs.*.library		GPRS模块的底层函数库，需要在codesys开发环境的库管理器中手动安装
+
 2. udp_sample.*.project    MIC7001V3通过GRPS模块收发UDP数据的例程，需要先安装上面的库文件
+
 3. canbus.*.project  	CAN总线例程
-5. canbus.new.api.*.project   另一种接口的CAN总线例程，需要安装：CANBusAPI.package
-6. RS485.*.project  	RS485通信例程
-7. files.*.project   	文件操作例程
-8. do_fault_detect.*.project 	输出端口故障诊断例程
-9. TCP.EtherNet.CFC.*.project   基于CFC语言的以太网TCP例程
+
+4. canbus.new.api.*.project   另一种接口的CAN总线例程，需要安装：CANBusAPI.package
+
+5. RS485.*.project  	RS485通信例程
+
+6. files.*.project   	文件操作例程
+
+7. do_fault_detect.*.project 	输出端口故障诊断例程
+
+8. TCP.EtherNet.CFC.*.project   基于CFC语言的以太网TCP例程
+
 9. TCP.EtherNet.ST.*.project   基于ST语言的以太网TCP例程
+
 10. EtherNet.multinode.*.project  多个以太网节点间通信的例程
+
 11. set_in_mode.*.project   设置数据端口工作模式的应用例程。
+
 12. retain.paras.*.project  基于文件系统创建永久变量的库。
+
 13. set_pwm_frequency.*.project  设置PWM端口频率的例程
+
 14. cyber-gprs.hearbeat.*.project  通过GPRS定时向云端发送心跳的例程
+
 15. Networkvariables.sender.project  通过网络变量发送数据的例程，需要安装 NetVarUDP 库
+
 16. Networkvariables.recver.project  通过网络变量接收数据的例程，需要安装 NetVarUDP 库
+
 17. Date.and.time.*.project  读取和设置系统时间的例程，需要安装 CAA DTUtil Extern 库。
+
 18. dint.data.save.*.project  以文件形式将dint类型的实时数据写入控制器内部的硬盘。
+
 19. real.data.save.*.project  以文件形式将real类型的实时数据写入控制器内部的硬盘。
+
 20. full_demo.*.project  一个相对完整的工程机械控制软件例程，包括柴油机控制，主油泵调节，与显示屏的通信，实时数据的保存等。
+
 21. mqtt_publish_sample.*.project  通过内置的GPRS模块实现MQTT协议的数据发布。
+
 22. HowToUse_MIC7001_baselib.*.project  MIC7001控制器基本函数库的使用示例。
+
+    
 
 
 例程使用方法：
@@ -38,7 +61,9 @@
 
 
 
-备注：上述例程仅为展示MIC7001控制器的功能而开发的，主要用于学习用途。
+风险提示：
+
+?    上述例程仅为展示MIC7001控制器的功能而开发的，主要用于学习用途。
 
 1. 由于团队成员个人的能力和知识局限性，可能存在各方面的疏漏和错误； 
 
