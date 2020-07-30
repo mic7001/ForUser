@@ -14,6 +14,18 @@
 4. 附加了其它一些与MIC7001相关的产品的资料，包括显示屏（“MID7b”子目录）、扩展IO模块（“MIR3501”，“MIR3502”等子目录），供开发人员参考；
 5. MIC7001子目录中包括赛搏机器智能自行开发的库文件（“cyber-lib"子目录）、codesys开发例程（”MIC7001例程“子目录）、codesys官方库文件（“codesys_lib"子目录）、结构图纸、配置文件和说明书。
 
+## Git 同步方法
+1. 下载并安装git客户端， 地址： [https://git-scm.com/download/win](https://git-scm.com/download/win)
+2.  在资源管理器中转到准备放置MIC7001开发资料的位置，比如：  D:/MIC7001/
+3.  在该目录中点击鼠标右键，在弹出的菜单中选择 Git Bash Here, 系统会弹出一个黑色命令行窗口
+4.  将后面的命令拷贝到该窗口中并回车运行：    git clone https://gitee.com/mic7001/ForUser.git
+5.  如果一切正常，git软件将会在D:/MIC7001 目录下建立一个ForUser 子目录， MIC7001的所有开发资料会保存在这里
+6.  由于该资料会频繁更新， 今后在使用该资料之前，最好与云端同步一次， 方法如下：
+	1）在资源管理器中导航到 D:\MIC7001\ForUser 子目录
+	2）点击鼠标右键，选择 Git Bash Here
+	3）输入命令： git pull   待执行完后， 关闭窗口即可。
+
+
 ver0.3 2020.7.30
 
 
