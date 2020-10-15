@@ -1,3 +1,11 @@
+###
+ # @Author: your name
+ # @Date: 2020-03-26 20:03:12
+ # @LastEditTime: 2020-10-15 14:26:25
+ # @LastEditors: Please set LastEditors
+ # @Description: In User Settings Edit
+ # @FilePath: \task7001d:\mic7001ForUser\MIC7001\远程及USB升级模板\codesys应用程序升级.实时版\mic7001_update\update.sh
+### 
 #bin/sh
 #This sh script is used for system update
 
